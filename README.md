@@ -93,6 +93,40 @@ print(result.text)
 
 > Nota: en esta fase los adaptadores son **stubs** y no ejecutan embeddings, FAISS ni generación real.
 
+## Flujo actual: carga + chunking
+
+Ejecutar desde la raiz del proyecto:
+
+- `python -m src.interfaces.cli.main`
+- `python -m src.interfaces.cli.main --chunk-size 500 --chunk-overlap 80`
+- `python -m src.interfaces.cli.main --create-sample-if-empty`
+
+Salida esperada:
+
+- total de documentos cargados desde `data/raw/`
+- total de chunks generados
+- muestra de chunks con metadata (`source_file`, `chunk_index`, `total_chunks`)
+
+## Validacion de ingesta SUNAT
+
+Script de validacion de fuentes web/PDF:
+
+- `python -m src.interfaces.cli.load_sunat_dataset`
+- `python scripts/test_sunat_ingestion.py --save-report`
+
+El script imprime:
+
+- total de documentos cargados
+- distribucion por tipo de fuente
+- numero de paginas/documentos por URL
+- longitud promedio de texto
+- ejemplo de 3 documentos cargados
+
+Tests de ingesta:
+
+- `pytest tests/test_document_loading.py`
+- `pytest -m integration tests/test_document_loading.py` (requiere red + dependencias web/pdf)
+
 ## Migración futura a Colab (simple)
 
 - Copiar/clonar el repositorio en Colab.

@@ -4,11 +4,21 @@ from typing import Any
 
 @dataclass(slots=True)
 class Document:
-    """Immutable-like document model from any academic source."""
+    """Normalized source document used across ingestion pipelines."""
 
-    document_id: str
-    content: str
+    doc_id: str
+    title: str
+    text: str
     source: str
-    title: str | None = None
-    source_type: str = "text"
+    page: int | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def document_id(self) -> str:
+        """Backward-compatible alias for previous field name."""
+        return self.doc_id
+
+    @property
+    def content(self) -> str:
+        """Backward-compatible alias for previous field name."""
+        return self.text

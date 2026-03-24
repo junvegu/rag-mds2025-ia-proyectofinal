@@ -13,6 +13,9 @@ accelerate
 python-dotenv
 jupyter
 ipykernel
+pypdf
+requests
+beautifulsoup4
 
 rouge-score
 sacrebleu
