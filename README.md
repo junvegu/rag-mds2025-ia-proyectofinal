@@ -226,6 +226,50 @@ Decision tomada:
   - costo computacional controlado para iteraciones academicas rapidas,
   - salida vectorial consistente (384-dim) lista para FAISS.
 
+### Fase 4: Indice vectorial FAISS (HNSW)
+
+Reporte base: `data/processed/faiss_report.json`
+
+#### Marco teorico breve
+
+La recuperacion por similitud en espacios de alta dimension exige estructuras que eviten comparar el query contra todos los vectores (costo lineal en \(N\)). Las tecnicas **ANN** (Approximate Nearest Neighbors) intercambian exactitud perfecta por latencia y memoria controladas. **HNSW** (Hierarchical Navigable Small World) construye un grafo en capas donde la busqueda comienza en niveles esparsos y se refina hacia abajo, tipicamente con buen balance **recall / tiempo** en indices densos en CPU o GPU. **FAISS** aporta implementaciones optimizadas de este y otros indices; aqui se usa el indice HNSW del adaptador `FAISSHNSWStore` para persistir vectores y metadatos alineados al pipeline previo.
+
+#### Hipotesis de diseno
+
+- Con \(N \approx 514\) chunks, un indice en memoria HNSW es suficiente para prototipo y demostracion sin servicios externos.
+- La coherencia **embedding ↔ indice ↔ metadatos** debe verificarse con pruebas automaticas (conteos, save/load, busquedas no vacias) antes de acoplar generacion o reranking.
+
+#### Parametros HNSW y trade-offs
+
+Valores registrados en el reporte (`m=24`, `ef_construction=120`, `ef_search=48`):
+
+- **M**: grado aproximado por nodo; valores mayores suelen mejorar recall y robustez del grafo, a costa de mas memoria y tiempo de construccion.
+- **ef_construction**: amplitud de la lista de candidatos al insertar; influye en la calidad del grafo generado.
+- **ef_search**: amplitud en consulta; subirlo suele mejorar recall en retrieval; bajarlo acelera la busqueda.
+
+La eleccion intermedia busca calidad estable en un corpus pequeno-mediano sin sobreajustar coste en Colab.
+
+#### Resultados cuantitativos (evidencia del reporte)
+
+- Alineacion pipeline: `total_documents=111`, `total_chunks=514`, `total_embeddings=514`, `index_vector_count=514`, `index_matches_embeddings=true`.
+- Integridad operativa: `load_save_ok=true`, `all_searches_non_empty=true`, `metadata_consistent=true`.
+- Modelo de embedding coherente con fase 3: `intfloat/multilingual-e5-small`.
+- Latencia de busqueda (orden de magnitud, una maquina local): tres consultas de prueba con `top_k=5` arrojaron tiempos del orden **\(10^{-4}\) s** por consulta en el reporte (valores puntuales: ~0.74 ms, ~0.14 ms, ~0.13 ms segun corrida registrada).
+
+#### Resultados cualitativos y lectura critica
+
+Se ejecutaron tres preguntas en espanol (dominio SUNAT / renta):
+
+1. **Renta de primera categoria y declaracion**: los mejores scores (~0.88–0.90) provienen sobre todo de la *Cartilla Instrucciones Personas* (PDF), con fragmentos alineados al tema; aparece un hit de otra URL (fraccionamiento) con score alto pero menor relevancia tematica — efecto esperable de similitud lexical/semantica cruzada en corpus heterogeneo.
+2. **Calculo del impuesto quinta categoria**: el top-1 en el reporte sigue siendo un pasaje asociado a **primera categoria** en la cartilla; mas abajo en el top-k aparecen fragmentos que mencionan quinta categoria y escalas. Esto ilustra el limite del **solo embedding + cosine** sin reranker ni filtros por metadata: preguntas finas por tipo de renta pueden confundirse si el texto comparte vocabulario de "categoria" e impuesto.
+3. **Fraccionamiento de deudas tributarias**: precision alta — el top-5 concentra chunks de la pagina `emprender.sunat.gob.pe/.../fraccionamiento-deudas` con scores ~0.90–0.92, coherente con una consulta bien acotada y lexico estable.
+
+#### Decision tomada
+
+- Mantener **FAISS HNSW** como backend de vector store por defecto en este proyecto, con parametros actuales y reporte versionado.
+- Documentar como trabajo futuro: **busqueda hibrida** (BM25 + denso), **reranking** cruzado, y/o **prompting o filtros** por tipo de fuente o seccion para reducir confusion entre categorias de renta.
+- **Nota de entorno**: en interpretaciones de rendimiento y estabilidad, usar **Python 3.11 o 3.12** recomendado; versiones muy nuevas (p. ej. 3.14) pueden provocar fallos nativos en la cadena FAISS / PyTorch / `sentence-transformers` no atribuibles a la logica del pipeline.
+
 ## Reportes y trazabilidad
 
 Cada corrida de validacion guarda evidencia en `data/processed/`:
@@ -233,12 +277,14 @@ Cada corrida de validacion guarda evidencia en `data/processed/`:
 - `ingestion_report.json`: cobertura y calidad de fuentes cargadas
 - `chunking_report.json`: calidad de segmentacion y configuracion de chunks
 - `embeddings_report.json`: rendimiento y consistencia de vectores
+- `faiss_report.json`: construccion del indice HNSW, save/load y busquedas de prueba
 
 Scripts asociados:
 
 - `python3 scripts/test_sunat_ingestion.py --save-report`
 - `python3 scripts/test_chunking.py --save-report`
 - `python3 scripts/test_embeddings.py --save-report`
+- `python3 scripts/test_faiss_hnsw.py --save-report`
 
 Sugerencia de trabajo para clase:
 
@@ -258,4 +304,5 @@ Sugerencia de trabajo para clase:
 ## Estado
 
 Bootstrap con contratos, entidades y configuración central.
-La lógica completa de RAG queda para siguientes iteraciones.
+Ingesta, chunking, embeddings e indice FAISS (HNSW) estan instrumentados con reportes en `data/processed/` y scripts de validacion.
+La capa completa de RAG (reranker, generacion con citas, evaluacion sistematica) queda para siguientes iteraciones.

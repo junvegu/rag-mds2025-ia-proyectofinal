@@ -13,6 +13,11 @@ class VectorStorePort(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def save(self, directory: str) -> None:
+        """Persist vector store artifacts."""
+        raise NotImplementedError
+
+    @abstractmethod
     def search(self, query_embedding: list[float], top_k: int) -> list[RetrievedChunk]:
         """Run dense search and return scored candidates."""
         raise NotImplementedError
