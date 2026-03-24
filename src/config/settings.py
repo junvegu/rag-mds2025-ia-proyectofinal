@@ -38,7 +38,7 @@ def get_settings() -> Settings:
         default_chunk_overlap=int(os.getenv("RAG_CHUNK_OVERLAP", "100")),
         default_min_chunk_length=int(os.getenv("RAG_MIN_CHUNK_LENGTH", "120")),
         default_top_k=int(os.getenv("RAG_TOP_K", "5")),
-        embedding_model_name=os.getenv("RAG_EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5"),
+        embedding_model_name=os.getenv("RAG_EMBEDDING_MODEL", "intfloat/multilingual-e5-small"),
         reranker_model_name=os.getenv("RAG_RERANKER_MODEL", "BAAI/bge-reranker-base"),
         generation_model_name=os.getenv("RAG_GENERATION_MODEL", "Qwen/Qwen2.5-3B-Instruct"),
         vector_index_name=os.getenv("RAG_VECTOR_INDEX", "faiss_hnsw"),
