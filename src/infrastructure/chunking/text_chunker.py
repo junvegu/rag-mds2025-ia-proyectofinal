@@ -1,6 +1,7 @@
 from src.application.ports.chunker_port import ChunkerPort
 from src.domain.entities.chunk import Chunk
 from src.domain.entities.document import Document
+from src.infrastructure.loaders.text_utils import normalize_text
 
 
 class TextChunker(ChunkerPort):
@@ -14,7 +15,7 @@ class TextChunker(ChunkerPort):
         if chunk_overlap >= chunk_size:
             raise ValueError("chunk_overlap must be smaller than chunk_size.")
 
-        text = document.content
+        text = normalize_text(document.content)
         if not text:
             return []
 
@@ -37,8 +38,10 @@ class TextChunker(ChunkerPort):
             chunks.append(
                 Chunk(
                     chunk_id=f"{document.document_id}-{idx}",
-                    document_id=document.document_id,
+                    doc_id=document.document_id,
                     text=text[start_char:end_char],
+                    source=document.source,
+                    page=document.page,
                     chunk_index=idx,
                     start_char=start_char,
                     end_char=end_char,

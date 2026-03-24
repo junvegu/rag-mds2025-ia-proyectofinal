@@ -15,6 +15,7 @@ class Settings:
     eval_data_dir: Path
     default_chunk_size: int
     default_chunk_overlap: int
+    default_min_chunk_length: int
     default_top_k: int
     embedding_model_name: str
     reranker_model_name: str
@@ -34,7 +35,8 @@ def get_settings() -> Settings:
         processed_data_dir=data_dir / "processed",
         eval_data_dir=data_dir / "eval",
         default_chunk_size=int(os.getenv("RAG_CHUNK_SIZE", "800")),
-        default_chunk_overlap=int(os.getenv("RAG_CHUNK_OVERLAP", "120")),
+        default_chunk_overlap=int(os.getenv("RAG_CHUNK_OVERLAP", "100")),
+        default_min_chunk_length=int(os.getenv("RAG_MIN_CHUNK_LENGTH", "120")),
         default_top_k=int(os.getenv("RAG_TOP_K", "5")),
         embedding_model_name=os.getenv("RAG_EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5"),
         reranker_model_name=os.getenv("RAG_RERANKER_MODEL", "BAAI/bge-reranker-base"),

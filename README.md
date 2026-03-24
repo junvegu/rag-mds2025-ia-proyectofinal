@@ -107,12 +107,24 @@ Salida esperada:
 - total de chunks generados
 - muestra de chunks con metadata (`source_file`, `chunk_index`, `total_chunks`)
 
+Defaults recomendados para el dataset SUNAT (111 documentos, mayoria PDF por pagina):
+
+- `chunk_size=800`
+- `chunk_overlap=100`
+- `min_chunk_length=120`
+
+Por que estos valores:
+
+- `800` mantiene suficiente contexto normativo por chunk sin disparar demasiado el total de embeddings.
+- `100` conserva continuidad entre chunks para no perder condiciones o incisos en cortes.
+- `120` filtra fragmentos muy cortos/ruidosos frecuentes en pie de pagina o encabezados extraidos de PDF.
+
 ## Validacion de ingesta SUNAT
 
 Script de validacion de fuentes web/PDF:
 
 - `python -m src.interfaces.cli.load_sunat_dataset`
-- `python scripts/test_sunat_ingestion.py --save-report`
+- `python3 scripts/test_sunat_ingestion.py --save-report`
 
 El script imprime:
 
