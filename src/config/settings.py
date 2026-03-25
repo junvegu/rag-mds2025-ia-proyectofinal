@@ -22,8 +22,16 @@ class Settings:
     default_hnsw_ef_construction: int
     default_hnsw_ef_search: int
     reranker_model_name: str
+    reranker_batch_size: int
     generation_model_name: str
     vector_index_name: str
+    hybrid_dense_weight: float
+    hybrid_sparse_weight: float
+    hybrid_top_k_dense: int
+    hybrid_top_k_sparse: int
+    hybrid_final_top_k: int
+    hybrid_score_normalization: str
+    hybrid_fusion_temperature: float
 
 
 @lru_cache(maxsize=1)
@@ -45,7 +53,18 @@ def get_settings() -> Settings:
         default_hnsw_m=int(os.getenv("RAG_HNSW_M", "24")),
         default_hnsw_ef_construction=int(os.getenv("RAG_HNSW_EF_CONSTRUCTION", "120")),
         default_hnsw_ef_search=int(os.getenv("RAG_HNSW_EF_SEARCH", "48")),
-        reranker_model_name=os.getenv("RAG_RERANKER_MODEL", "BAAI/bge-reranker-base"),
+        reranker_model_name=os.getenv(
+            "RAG_RERANKER_MODEL",
+            "cross-encoder/ms-marco-multilingual-MiniLM-L12-v2",
+        ),
+        reranker_batch_size=int(os.getenv("RAG_RERANKER_BATCH_SIZE", "16")),
         generation_model_name=os.getenv("RAG_GENERATION_MODEL", "Qwen/Qwen2.5-3B-Instruct"),
         vector_index_name=os.getenv("RAG_VECTOR_INDEX", "faiss_hnsw"),
+        hybrid_dense_weight=float(os.getenv("RAG_HYBRID_DENSE_WEIGHT", "0.45")),
+        hybrid_sparse_weight=float(os.getenv("RAG_HYBRID_SPARSE_WEIGHT", "0.55")),
+        hybrid_top_k_dense=int(os.getenv("RAG_HYBRID_TOP_K_DENSE", "20")),
+        hybrid_top_k_sparse=int(os.getenv("RAG_HYBRID_TOP_K_SPARSE", "20")),
+        hybrid_final_top_k=int(os.getenv("RAG_HYBRID_FINAL_TOP_K", "10")),
+        hybrid_score_normalization=os.getenv("RAG_HYBRID_SCORE_NORM", "softmax"),
+        hybrid_fusion_temperature=float(os.getenv("RAG_HYBRID_FUSION_TEMPERATURE", "1.0")),
     )

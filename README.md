@@ -267,8 +267,89 @@ Se ejecutaron tres preguntas en espanol (dominio SUNAT / renta):
 #### Decision tomada
 
 - Mantener **FAISS HNSW** como backend de vector store por defecto en este proyecto, con parametros actuales y reporte versionado.
-- Documentar como trabajo futuro: **busqueda hibrida** (BM25 + denso), **reranking** cruzado, y/o **prompting o filtros** por tipo de fuente o seccion para reducir confusion entre categorias de renta.
+- **Busqueda hibrida** (BM25 + FAISS denso): implementada en Fase 5; siguen como mejora **reranking** cruzado y/o **filtros** por tipo de fuente o seccion para reducir confusion entre categorias de renta.
 - **Nota de entorno**: en interpretaciones de rendimiento y estabilidad, usar **Python 3.11 o 3.12** recomendado; versiones muy nuevas (p. ej. 3.14) pueden provocar fallos nativos en la cadena FAISS / PyTorch / `sentence-transformers` no atribuibles a la logica del pipeline.
+
+### Fase 5: Retrieval hibrido (BM25 + FAISS)
+
+#### Por que BM25 complementa al denso en SUNAT
+
+El texto tributario repite formulas legales parecidas entre tipos de renta (“categoria”, “impuesto”, “declaracion”). Los embeddings capturan **similitud semantica global** y a veces suben fragmentos vecinos aunque el **termino discriminativo** sea otro (p. ej. “quinta” vs “primera”). **BM25** privilegia la **coincidencia lexica** con la pregunta: si el usuario nombra “quinta categoria”, los pasajes que repiten esas palabras suelen puntuar mas alto que un bloque generico de “primera categoria” con estructura similar. Combinar ambos reduce el riesgo de que un solo canal (solo denso o solo lexico) domine el ranking y amplia el conjunto de **candidatos** para un reranker posterior.
+
+#### Estrategia de fusion (SUNAT, simple para slides)
+
+1. Se obtienen candidatos **por separado**: top-`k` denso (FAISS) y top-`k` BM25.
+2. **Normalizacion por canal y por consulta** sobre esos candidatos (no sobre todo el corpus):
+   - **Por defecto: softmax** con temperatura `T` (estable numericamente): convierte los scores crudos de cada canal en una distribucion comparable aunque BM25 y producto interno FAISS vivan en escalas distintas.
+   - Alternativa configurable: **min-max** lineal (`RAG_HYBRID_SCORE_NORM=minmax`), util para comparar en experimentos o si se prefiere explicar solo “estirar a [0,1]”.
+3. **Combinacion convexa**: `hybrid_score = w_dense * d_norm + w_sparse * s_norm` (si un chunk solo aparece en un canal, el otro termino es 0).
+4. **Deduplicacion** por `chunk_id`, orden por `hybrid_score`, truncado a `final_top_k`.
+
+**Pesos por defecto del proyecto:** `w_dense = 0.45`, `w_sparse = 0.55`. Motivo: el denso ya cubre bien similitud global; el fallo tipico aqui es la **competicion entre categorias** con redaccion parecida. Un **ligero** peso extra al BM25 refuerza terminos discriminativos en la pregunta (“quinta”, “primera”, “cuarta”) sin apagar el canal denso (parafrasis, sinonimos). Siguen siendo configurables por `.env` para ablaciones en informe o clase.
+
+**Rendimiento (Colab):** softmax es O(k) por canal con k pequeno (p. ej. 20); coste dominado por embedding + FAISS + BM25, no por la fusion.
+
+#### Implementacion
+
+- `src/infrastructure/retrieval/bm25_retriever.py`: tokenizacion simple Unicode (`re` + minusculas), `BM25Okapi` sobre textos de `Chunk`, `search` devuelve `Bm25Hit` (chunk_id, doc_id, source, page, text, score).
+- `src/infrastructure/retrieval/hybrid_retriever.py`: normalizacion **softmax** (defecto) o **min-max** por lista; `hybrid_score` como arriba; salida `HybridChunkResult` con scores crudos y `hybrid_score`.
+- `src/application/use_cases/build_bm25_index.py`: ajusta el indice BM25 desde `list[Chunk]`.
+- `src/application/use_cases/retrieve_context.py`: embebe la pregunta, consulta FAISS y BM25, delega en `HybridRetriever.fuse`.
+
+Parametros en `Settings` / `.env` (`RAG_HYBRID_*`): `dense_weight`, `sparse_weight`, `top_k_dense`, `top_k_sparse`, `final_top_k`, `score_norm` (`softmax` \| `minmax`), `fusion_temperature`. Helper: `RetrieveContextUseCase.default_hybrid_config()` lee esos valores.
+
+#### Ejemplo de uso
+
+Desde la raiz del proyecto (con dependencias instaladas y red si hace falta para URLs):
+
+```bash
+python3 scripts/test_hybrid_retrieval.py --top-k 5
+python3 scripts/test_hybrid_retrieval.py --save-report   # escribe data/processed/hybrid_retrieval_report.json
+```
+
+Uso programatico minimo:
+
+```python
+from src.application.use_cases.build_bm25_index import BuildBm25IndexUseCase
+from src.application.use_cases.retrieve_context import RetrieveContextUseCase
+from src.domain.entities.retrieval import HybridRetrieverConfig
+from src.infrastructure.retrieval.hybrid_retriever import HybridRetriever
+
+bm25 = BuildBm25IndexUseCase().execute(chunks)
+hybrid = HybridRetriever(RetrieveContextUseCase.default_hybrid_config())
+uc = RetrieveContextUseCase(embedder, faiss_store, bm25, hybrid)
+results = uc.execute("¿Cómo se calcula el impuesto a la renta de quinta categoría?")
+for r in results:
+    print(r.hybrid_score, r.dense_score, r.sparse_score, r.text[:80])
+```
+
+Tests: `pytest tests/test_hybrid_retrieval.py`.
+
+### Fase 6: Reranking (cross-encoder)
+
+**Idea:** el retrieval híbrido produce un conjunto pequeño de candidatos; un **cross-encoder** vuelve a puntuar cada par *(consulta, pasaje)* con atención cruzada (más preciso que bi-encoder, más costoso). Reordena sin perder metadata del híbrido.
+
+**Modelo por defecto (SUNAT, pragmático):** `cross-encoder/ms-marco-multilingual-MiniLM-L12-v2` (`RAG_RERANKER_MODEL`). Es un cross-encoder **multilingüe** (incluye español), **más liviano** que la familia BGE reranker y suele ser **más rápido en Colab** al rerankear pocos pasajes (p. ej. 10–20 tras el híbrido), con coste de inferencia acotado para una demo académica. **Subida de calidad** si aceptas más VRAM/tiempo: `BAAI/bge-reranker-base`. **Máximo multilingüe (más pesado):** `BAAI/bge-reranker-v2-m3`. **No recomendado para español:** `cross-encoder/ms-marco-MiniLM-L-6-v2` (centrado en inglés).
+
+**Código:** `src/infrastructure/rerankers/cross_encoder_reranker.py` (`CrossEncoderReranker`), `src/application/use_cases/rerank_context.py` (`RerankContextUseCase`). Salida: `RerankedChunkResult` (campos del híbrido + `rerank_score`, `rerank_position` 1-based). Límite: argumento `top_k` del caso de uso.
+
+**Ejemplo (tras hybrid):**
+
+```python
+from src.application.use_cases.retrieve_context import RetrieveContextUseCase
+from src.application.use_cases.rerank_context import RerankContextUseCase
+from src.infrastructure.rerankers.cross_encoder_reranker import CrossEncoderReranker
+
+hybrid_hits = retrieve_uc.execute("¿Qué es la quinta categoría?")
+rerank_uc = RerankContextUseCase(reranker=CrossEncoderReranker())
+final_ctx = rerank_uc.execute("¿Qué es la quinta categoría?", hybrid_hits, top_k=5)
+for row in final_ctx:
+    print(row.rerank_position, row.rerank_score, row.hybrid_score, row.text[:100])
+```
+
+Tests: `pytest tests/test_rerank_context.py`.
+
+**Validación end-to-end (híbrido vs rerank):** `python3 scripts/test_reranker.py --top-k 5 --save-report` → `data/processed/reranker_report.json` (tiempos, auditoría léxica, conclusiones `reranker_mejora` / `empate` / `no_mejora` / `requiere_revision_manual`).
 
 ## Reportes y trazabilidad
 
@@ -278,6 +359,8 @@ Cada corrida de validacion guarda evidencia en `data/processed/`:
 - `chunking_report.json`: calidad de segmentacion y configuracion de chunks
 - `embeddings_report.json`: rendimiento y consistencia de vectores
 - `faiss_report.json`: construccion del indice HNSW, save/load y busquedas de prueba
+- `hybrid_retrieval_report.json` (opcional): comparacion FAISS vs BM25 vs hibrido, auditoria de terminos clave y conclusiones por consulta
+- `reranker_report.json` (opcional): orden hibrido vs tras cross-encoder, tiempos y conclusiones por consulta
 
 Scripts asociados:
 
@@ -285,6 +368,8 @@ Scripts asociados:
 - `python3 scripts/test_chunking.py --save-report`
 - `python3 scripts/test_embeddings.py --save-report`
 - `python3 scripts/test_faiss_hnsw.py --save-report`
+- `python3 scripts/test_hybrid_retrieval.py --save-report` (validacion denso vs hibrido + JSON)
+- `python3 scripts/test_reranker.py --save-report` (hibrido vs rerank + JSON)
 
 Sugerencia de trabajo para clase:
 
@@ -298,11 +383,12 @@ Sugerencia de trabajo para clase:
 - Instalar `requirements.txt`.
 - Ajustar variables por celda o `.env`:
   - `RAG_PROJECT_ROOT`
-  - modelos por defecto (`RAG_EMBEDDING_MODEL`, `RAG_RERANKER_MODEL`, `RAG_GENERATION_MODEL`)
+  - modelos por defecto (`RAG_EMBEDDING_MODEL`, `RAG_RERANKER_MODEL`, `RAG_RERANKER_BATCH_SIZE`, `RAG_GENERATION_MODEL`)
+  - hibrido (`RAG_HYBRID_*`, incl. `RAG_HYBRID_SCORE_NORM`, `RAG_HYBRID_FUSION_TEMPERATURE`)
 - Reutilizar `src/interfaces/rag_pipeline.py` como entrada estable.
 
 ## Estado
 
 Bootstrap con contratos, entidades y configuración central.
-Ingesta, chunking, embeddings e indice FAISS (HNSW) estan instrumentados con reportes en `data/processed/` y scripts de validacion.
-La capa completa de RAG (reranker, generacion con citas, evaluacion sistematica) queda para siguientes iteraciones.
+Ingesta, chunking, embeddings, indice FAISS (HNSW), **retrieval hibrido** y **reranking cross-encoder** estan implementados; reportes JSON en `data/processed/` cubren fases anteriores salvo rerank.
+Quedan generacion (Qwen), citas por oracion y evaluacion sistematica (BLEU/ROUGE, etc.).
