@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 from src.domain.entities.document import Document
 from src.infrastructure.loaders.common import build_stable_doc_id, infer_title_from_source
+from src.infrastructure.loaders.http_headers import browser_like_headers
 from src.infrastructure.loaders.text_utils import normalize_web_text
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,11 @@ class WebLoader:
             raise ImportError("requests and beautifulsoup4 are required for WebLoader.") from exc
 
         try:
-            response = requests.get(url, timeout=self._timeout_seconds)
+            response = requests.get(
+                url,
+                timeout=self._timeout_seconds,
+                headers=browser_like_headers(for_pdf=False),
+            )
             response.raise_for_status()
         except requests.RequestException as exc:
             raise ValueError(f"Could not fetch URL '{url}': {exc}") from exc

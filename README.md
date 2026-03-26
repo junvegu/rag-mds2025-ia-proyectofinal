@@ -75,9 +75,14 @@ rag-colab-final/
 
 ## Arranque local
 
-1. `python -m venv .venv`
+**Versión de Python:** usa **3.11 o 3.12** (no 3.14 como `python3` por defecto en Homebrew: FAISS/torch suelen hacer *segfault*). En la raíz del repo hay `.python-version` (**3.12.8**) para [pyenv](https://github.com/pyenv/pyenv): al entrar en la carpeta, pyenv usa esa versión. Si no la tienes: `pyenv install 3.12.8`. Sin pyenv: `python3.12 -m venv .venv` (p. ej. `brew install python@3.12`).
+
+1. `python -m venv .venv` (con 3.12 activo, o explícito: `python3.12 -m venv .venv`)
 2. `source .venv/bin/activate`
 3. `pip install -r requirements.txt`
+
+Tras el paso 2, conviene comprobar que **`python -V` y `pip -V` muestran la misma versión**; si `pip` apunta a otro Python (p. ej. 3.14), los paquetes se instalan en otra carpeta y aparecen errores como `No module named 'rank_bm25'`. En ese caso, borra `.venv` y vuelve a crearlo con el intérprete deseado activo.
+
 4. (opcional) crear `.env` desde `.env.example`
 5. `pytest`
 
@@ -329,7 +334,7 @@ Tests: `pytest tests/test_hybrid_retrieval.py`.
 
 **Idea:** el retrieval híbrido produce un conjunto pequeño de candidatos; un **cross-encoder** vuelve a puntuar cada par *(consulta, pasaje)* con atención cruzada (más preciso que bi-encoder, más costoso). Reordena sin perder metadata del híbrido.
 
-**Modelo por defecto (SUNAT, pragmático):** `cross-encoder/ms-marco-multilingual-MiniLM-L12-v2` (`RAG_RERANKER_MODEL`). Es un cross-encoder **multilingüe** (incluye español), **más liviano** que la familia BGE reranker y suele ser **más rápido en Colab** al rerankear pocos pasajes (p. ej. 10–20 tras el híbrido), con coste de inferencia acotado para una demo académica. **Subida de calidad** si aceptas más VRAM/tiempo: `BAAI/bge-reranker-base`. **Máximo multilingüe (más pesado):** `BAAI/bge-reranker-v2-m3`. **No recomendado para español:** `cross-encoder/ms-marco-MiniLM-L-6-v2` (centrado en inglés).
+**Modelo por defecto (SUNAT, pragmático):** `cross-encoder/ms-marco-MiniLM-L-12-v2` (`RAG_RERANKER_MODEL`) — **público** en Hugging Face y liviano (el id `cross-encoder/ms-marco-multilingual-MiniLM-L12-v2` puede responder **401** sin token según el Hub). Orientado a **inglés**; para **español** prioriza `BAAI/bge-reranker-v2-m3` o `BAAI/bge-reranker-base` si aceptas más coste. Si ves **401** en descargas, revisa `HF_TOKEN` y `~/.netrc`; el código reintenta sin token y con cliente Hub sin `trust_env`.
 
 **Código:** `src/infrastructure/rerankers/cross_encoder_reranker.py` (`CrossEncoderReranker`), `src/application/use_cases/rerank_context.py` (`RerankContextUseCase`). Salida: `RerankedChunkResult` (campos del híbrido + `rerank_score`, `rerank_position` 1-based). Límite: argumento `top_k` del caso de uso.
 
@@ -351,6 +356,34 @@ Tests: `pytest tests/test_rerank_context.py`.
 
 **Validación end-to-end (híbrido vs rerank):** `python3 scripts/test_reranker.py --top-k 5 --save-report` → `data/processed/reranker_report.json` (tiempos, auditoría léxica, conclusiones `reranker_mejora` / `empate` / `no_mejora` / `requiere_revision_manual`).
 
+### Fase 7: Generación (Qwen)
+
+**Idea:** **Sistema** = reglas fijas del RAG (solo evidencia en contexto, sin inventar, qué hacer si falta información, estilo breve). **Usuario** = tres bloques etiquetados: `CONTEXTO DOCUMENTAL` → `PREGUNTA DEL USUARIO` → `TAREA` (anclaje). Helper exportado: `build_sunat_rag_user_message`. `QwenGenerator` aplica `apply_chat_template` sobre sistema + usuario.
+
+**Modelo por defecto (Colab pragmático):** `Qwen/Qwen2.5-1.5B-Instruct` (`RAG_GENERATION_MODEL`). Suele caber en GPU tipo T4 en fp16 con contexto moderado; para más calidad (más VRAM): `Qwen/Qwen2.5-3B-Instruct` o `7B` si el entorno lo permite.
+
+**Parámetros (env):** `RAG_GENERATION_MAX_NEW_TOKENS` (default 512), `RAG_GENERATION_TEMPERATURE` (0.3), `RAG_GENERATION_TOP_P` (0.9), `RAG_GENERATION_DO_SAMPLE` (true).
+
+**Código:** `src/infrastructure/llms/qwen_generator.py`, `src/application/use_cases/generate_answer.py`. Salida: `Answer` con `text`, `question`, `metadata["prompt_system"]`, `metadata["prompt_user"]`, `metadata["context_chunks"]` (lista de referencias; citas por oración quedan para después).
+
+**Ejemplo (tras rerank):**
+
+```python
+from src.application.use_cases.generate_answer import GenerateAnswerUseCase
+from src.infrastructure.llms.qwen_generator import QwenGenerator
+
+gen_uc = GenerateAnswerUseCase(llm=QwenGenerator())
+answer = gen_uc.execute("¿Qué es la quinta categoría?", final_ctx)  # list[RerankedChunkResult]
+print(answer.text)
+print(answer.metadata["context_chunks"])
+```
+
+Tests: `pytest tests/test_generate_answer.py tests/test_qwen_generator.py`.
+
+**Validación end-to-end hasta Qwen:** `python3 scripts/test_generation.py --top-k 5 --save-report` → `data/processed/generation_report.json` (tiempos retrieval/rerank/generación, contexto usado, respuesta, heurísticas de calidad).
+
+**Si el script termina en `segmentation fault` tras “Successfully loaded faiss”:** en **macOS** con **Python 3.12** suele ser conflicto **OpenMP** entre **PyTorch (MPS)** y **faiss-cpu**; `scripts/test_faiss_hnsw.py`, `test_hybrid_retrieval.py`, `test_reranker.py` y `test_generation.py` aplican mitigación vía `src/config/runtime_env.py` (`OMP_NUM_THREADS=1`, `KMP_DUPLICATE_LIB_OK=TRUE`, etc.). Si ejecutas otro entrypoint, exporta esas variables antes de `python`. En **Python 3.13+** (p. ej. 3.14) también fallan a menudo las ruedas nativas: **3.11/3.12**, venv limpio y `pip install -r requirements.txt`; `test_generation.py` sale con código 2 en 3.14+ salvo `RAG_ALLOW_EXPERIMENTAL_PYTHON=1`.
+
 ## Reportes y trazabilidad
 
 Cada corrida de validacion guarda evidencia en `data/processed/`:
@@ -361,6 +394,7 @@ Cada corrida de validacion guarda evidencia en `data/processed/`:
 - `faiss_report.json`: construccion del indice HNSW, save/load y busquedas de prueba
 - `hybrid_retrieval_report.json` (opcional): comparacion FAISS vs BM25 vs hibrido, auditoria de terminos clave y conclusiones por consulta
 - `reranker_report.json` (opcional): orden hibrido vs tras cross-encoder, tiempos y conclusiones por consulta
+- `generation_report.json` (opcional): pipeline completo hasta respuesta Qwen, tiempos y flags de calidad heurística
 
 Scripts asociados:
 
@@ -370,6 +404,7 @@ Scripts asociados:
 - `python3 scripts/test_faiss_hnsw.py --save-report`
 - `python3 scripts/test_hybrid_retrieval.py --save-report` (validacion denso vs hibrido + JSON)
 - `python3 scripts/test_reranker.py --save-report` (hibrido vs rerank + JSON)
+- `python3 scripts/test_generation.py --save-report` (pipeline + Qwen + JSON)
 
 Sugerencia de trabajo para clase:
 
@@ -383,12 +418,12 @@ Sugerencia de trabajo para clase:
 - Instalar `requirements.txt`.
 - Ajustar variables por celda o `.env`:
   - `RAG_PROJECT_ROOT`
-  - modelos por defecto (`RAG_EMBEDDING_MODEL`, `RAG_RERANKER_MODEL`, `RAG_RERANKER_BATCH_SIZE`, `RAG_GENERATION_MODEL`)
+  - modelos y generación (`RAG_EMBEDDING_MODEL`, `RAG_RERANKER_*`, `RAG_GENERATION_MODEL`, `RAG_GENERATION_MAX_NEW_TOKENS`, `RAG_GENERATION_TEMPERATURE`, `RAG_GENERATION_TOP_P`, `RAG_GENERATION_DO_SAMPLE`)
   - hibrido (`RAG_HYBRID_*`, incl. `RAG_HYBRID_SCORE_NORM`, `RAG_HYBRID_FUSION_TEMPERATURE`)
 - Reutilizar `src/interfaces/rag_pipeline.py` como entrada estable.
 
 ## Estado
 
 Bootstrap con contratos, entidades y configuración central.
-Ingesta, chunking, embeddings, indice FAISS (HNSW), **retrieval hibrido** y **reranking cross-encoder** estan implementados; reportes JSON en `data/processed/` cubren fases anteriores salvo rerank.
-Quedan generacion (Qwen), citas por oracion y evaluacion sistematica (BLEU/ROUGE, etc.).
+Ingesta, chunking, embeddings, indice FAISS (HNSW), **retrieval hibrido**, **reranking** y **generacion Qwen** (`GenerateAnswerUseCase` + `QwenGenerator`) estan implementados; reportes JSON cubren fases hasta rerank.
+Quedan citas por oracion, grounding formal y evaluacion sistematica (BLEU/ROUGE, etc.).

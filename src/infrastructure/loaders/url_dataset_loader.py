@@ -4,6 +4,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from src.domain.entities.document import Document
+from src.infrastructure.loaders.http_headers import browser_like_headers
 from src.infrastructure.loaders.pdf_loader import PDFLoader
 from src.infrastructure.loaders.txt_loader import TXTLoader
 from src.infrastructure.loaders.web_loader import WebLoader
@@ -67,7 +68,12 @@ class URLDatasetLoader:
             return "html"
 
         try:
-            response = requests.head(url, timeout=10, allow_redirects=True)
+            response = requests.head(
+                url,
+                timeout=10,
+                allow_redirects=True,
+                headers=browser_like_headers(for_pdf=path.endswith(".pdf")),
+            )
             content_type = response.headers.get("Content-Type", "").lower()
             if "application/pdf" in content_type:
                 return "pdf"

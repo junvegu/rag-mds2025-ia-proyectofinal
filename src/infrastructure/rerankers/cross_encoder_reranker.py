@@ -6,6 +6,10 @@ import logging
 
 from src.application.ports.reranker_port import RerankerPort
 from src.domain.entities.retrieval import HybridChunkResult, RerankedChunkResult
+from src.infrastructure.huggingface_auth_fallback import (
+    huggingface_invalid_env_token_error,
+    huggingface_public_hub_session,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +29,10 @@ class CrossEncoderReranker(RerankerPort):
     """
     Scores (query, passage) pairs and reorders candidates.
 
-    Default (SUNAT / Colab): ``cross-encoder/ms-marco-multilingual-MiniLM-L12-v2`` —
-    multilingüe (incl. español), más ligero que BGE rerankers, adecuado para ~10–20
-    candidatos y demos sin sobrecoste. Override con ``RAG_RERANKER_MODEL`` o el
-    argumento ``model_name`` (p. ej. ``BAAI/bge-reranker-base`` si priorizas máxima precisión).
+    Default (SUNAT / Colab): ``cross-encoder/ms-marco-MiniLM-L-12-v2`` — público en HF,
+    liviano; orientado a inglés pero usable en demos. Para **español** prioriza
+    ``BAAI/bge-reranker-v2-m3`` o modelos multilingües si tienes ``HF_TOKEN`` válido.
+    Override con ``RAG_RERANKER_MODEL`` o ``model_name``.
     """
 
     def __init__(
@@ -87,4 +91,14 @@ class CrossEncoderReranker(RerankerPort):
         except ImportError as exc:
             raise ImportError("sentence-transformers is required for CrossEncoder reranking.") from exc
         logger.info("Loading cross-encoder: %s", model_name)
-        return CrossEncoder(model_name)
+        try:
+            return CrossEncoder(model_name)
+        except Exception as exc:  # noqa: BLE001
+            if not huggingface_invalid_env_token_error(exc):
+                raise
+            logger.warning(
+                "HF Hub rejected auth for %s; retrying anonymous session (fix HF_TOKEN or ~/.netrc if downloads keep failing).",
+                model_name,
+            )
+            with huggingface_public_hub_session():
+                return CrossEncoder(model_name, token=False)

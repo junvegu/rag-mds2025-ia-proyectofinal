@@ -1,13 +1,10 @@
 from abc import ABC, abstractmethod
 
-from src.domain.entities.answer import Answer
-from src.domain.entities.retrieval import RetrievedChunk
-
 
 class LLMPort(ABC):
-    """Generate grounded answers from ranked context."""
+    """Causal LM generation from system + user strings (chat-style)."""
 
     @abstractmethod
-    def generate(self, question: str, context: list[RetrievedChunk]) -> Answer:
-        """Generate an answer object with optional citations."""
+    def generate(self, *, system: str | None = None, user: str) -> str:
+        """Return assistant text only (no chat template wrapper)."""
         raise NotImplementedError

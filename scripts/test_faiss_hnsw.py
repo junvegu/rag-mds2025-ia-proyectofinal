@@ -15,6 +15,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.config.runtime_env import apply_darwin_openmp_mitigations
+
+apply_darwin_openmp_mitigations()
+
 from src.application.use_cases.build_vector_index import BuildVectorIndexUseCase
 from src.application.use_cases.chunk_documents import ChunkDocumentsUseCase
 from src.application.use_cases.embed_chunks import EmbedChunksUseCase

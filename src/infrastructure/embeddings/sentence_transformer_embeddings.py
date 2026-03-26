@@ -1,6 +1,10 @@
 import logging
 
 from src.application.ports.embedding_port import EmbeddingPort
+from src.infrastructure.huggingface_auth_fallback import (
+    huggingface_invalid_env_token_error,
+    huggingface_public_hub_session,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,4 +60,14 @@ class SentenceTransformerEmbeddings(EmbeddingPort):
         try:
             return SentenceTransformer(model_name)
         except Exception as exc:  # noqa: BLE001
+            if huggingface_invalid_env_token_error(exc):
+                logger.warning(
+                    "HF Hub rejected auth for %s; retrying with token=False (fix or unset HF_TOKEN).",
+                    model_name,
+                )
+                try:
+                    with huggingface_public_hub_session():
+                        return SentenceTransformer(model_name, token=False)
+                except Exception as exc2:  # noqa: BLE001
+                    raise ValueError(f"Unable to load embedding model '{model_name}': {exc2}") from exc2
             raise ValueError(f"Unable to load embedding model '{model_name}': {exc}") from exc

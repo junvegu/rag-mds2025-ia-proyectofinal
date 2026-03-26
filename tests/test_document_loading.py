@@ -46,7 +46,7 @@ def test_loaded_documents_have_core_fields() -> None:
     assert any(doc.source.strip() for doc in documents)
 
 
-def test_pdf_documents_preserve_page_when_available(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_pdf_documents_preserve_page_when_available() -> None:
     loader = URLDatasetLoader()
 
     class _FakePDFLoader:
@@ -57,7 +57,7 @@ def test_pdf_documents_preserve_page_when_available(monkeypatch: pytest.MonkeyPa
             return [_sample_document(2, page=1)]
 
     loader.pdf_loader = _FakePDFLoader()  # type: ignore[assignment]
-    monkeypatch.setattr(loader, "_detect_remote_kind", lambda _: "pdf")
+    # URL termina en .pdf → _detect_remote_kind devuelve "pdf" sin HEAD
     docs = loader._load_one("https://example.com/sunat.pdf")
     assert docs
     assert docs[0].page == 3
@@ -71,15 +71,15 @@ def test_normalize_text_removes_repeated_spaces() -> None:
 
 
 def test_loader_continues_when_one_source_fails(monkeypatch: pytest.MonkeyPatch) -> None:
-    loader = URLDatasetLoader()
     sources = ["ok-source", "bad-source", "ok-source-2"]
 
-    def _fake_load_one(source: str) -> list[Document]:
+    def _fake_load_one(self: URLDatasetLoader, source: str) -> list[Document]:
         if source == "bad-source":
             raise ValueError("boom")
         return [_sample_document(99)]
 
-    monkeypatch.setattr(loader, "_load_one", _fake_load_one)
+    monkeypatch.setattr(URLDatasetLoader, "_load_one", _fake_load_one)
+    loader = URLDatasetLoader()
     docs = loader.load(sources)
     assert len(docs) == 2
 

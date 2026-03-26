@@ -24,6 +24,10 @@ class Settings:
     reranker_model_name: str
     reranker_batch_size: int
     generation_model_name: str
+    generation_max_new_tokens: int
+    generation_temperature: float
+    generation_top_p: float
+    generation_do_sample: bool
     vector_index_name: str
     hybrid_dense_weight: float
     hybrid_sparse_weight: float
@@ -55,10 +59,17 @@ def get_settings() -> Settings:
         default_hnsw_ef_search=int(os.getenv("RAG_HNSW_EF_SEARCH", "48")),
         reranker_model_name=os.getenv(
             "RAG_RERANKER_MODEL",
-            "cross-encoder/ms-marco-multilingual-MiniLM-L12-v2",
+            "cross-encoder/ms-marco-MiniLM-L-12-v2",
         ),
         reranker_batch_size=int(os.getenv("RAG_RERANKER_BATCH_SIZE", "16")),
-        generation_model_name=os.getenv("RAG_GENERATION_MODEL", "Qwen/Qwen2.5-3B-Instruct"),
+        generation_model_name=os.getenv(
+            "RAG_GENERATION_MODEL",
+            "Qwen/Qwen2.5-1.5B-Instruct",
+        ),
+        generation_max_new_tokens=int(os.getenv("RAG_GENERATION_MAX_NEW_TOKENS", "512")),
+        generation_temperature=float(os.getenv("RAG_GENERATION_TEMPERATURE", "0.3")),
+        generation_top_p=float(os.getenv("RAG_GENERATION_TOP_P", "0.9")),
+        generation_do_sample=os.getenv("RAG_GENERATION_DO_SAMPLE", "true").lower() in ("1", "true", "yes"),
         vector_index_name=os.getenv("RAG_VECTOR_INDEX", "faiss_hnsw"),
         hybrid_dense_weight=float(os.getenv("RAG_HYBRID_DENSE_WEIGHT", "0.45")),
         hybrid_sparse_weight=float(os.getenv("RAG_HYBRID_SPARSE_WEIGHT", "0.55")),
