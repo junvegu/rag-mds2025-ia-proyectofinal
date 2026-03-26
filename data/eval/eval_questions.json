@@ -1,0 +1,76 @@
+{
+  "version": "1",
+  "description": "Conjunto pequeño SUNAT para métricas automáticas. Las referencias son orientativas; ROUGE/BLEU no sustituyen revisión humana ni grounding.",
+  "items": [
+    {
+      "id": "ev_01",
+      "topic": "primera_categoria",
+      "question": "¿Qué ingresos conforman la renta bruta de primera categoría según la cartilla SUNAT?",
+      "reference_answer": "En primera categoría la renta bruta incluye ingresos por el alquiler en efectivo o en especie del arrendamiento de predios urbanos y rurales, entre otros previstos para rentas de capital.",
+      "expected_keywords": ["primera", "alquiler", "renta"]
+    },
+    {
+      "id": "ev_02",
+      "topic": "cuarta_categoria",
+      "question": "¿Qué son las rentas de cuarta categoría en el marco del impuesto a la renta?",
+      "reference_answer": "Las rentas de cuarta categoría son las obtenidas por el ejercicio independiente de una profesión u oficio, sin relación de dependencia.",
+      "expected_keywords": ["cuarta", "profesión", "independiente"]
+    },
+    {
+      "id": "ev_03",
+      "topic": "quinta_categoria",
+      "question": "¿Cómo se define la quinta categoría de renta para un trabajador dependiente?",
+      "reference_answer": "La quinta categoría grava las rentas del trabajo en relación de dependencia, cuando existe subordinación y remuneración por el servicio personal.",
+      "expected_keywords": ["quinta", "trabajo", "dependencia"]
+    },
+    {
+      "id": "ev_04",
+      "topic": "fraccionamiento",
+      "question": "¿Qué es el fraccionamiento de deudas tributarias ante la SUNAT?",
+      "reference_answer": "Es un mecanismo que permite pagar la deuda tributaria en cuotas o aplazar el pago, según las condiciones que establece la administración.",
+      "expected_keywords": ["fraccionamiento", "deuda", "cuotas"]
+    },
+    {
+      "id": "ev_05",
+      "topic": "pago_electronico",
+      "question": "¿Qué opciones existen para pagar electrónicamente tributos a la SUNAT?",
+      "reference_answer": "Existen opciones de pago electrónico tales como cargo en cuenta, pago con tarjeta y otros canales habilitados, usando Clave SOL u operaciones en línea según lo indicado por SUNAT.",
+      "expected_keywords": ["pago", "electrónico", "SUNAT"]
+    },
+    {
+      "id": "ev_06",
+      "topic": "declaracion_anual",
+      "question": "¿Qué establece la resolución de superintendencia sobre el cronograma de declaración jurada anual del impuesto a la renta?",
+      "reference_answer": "La normativa SUNAT aprueba cronogramas y plazos para la declaración jurada anual del impuesto a la renta y del ITF para personas naturales, según lo publicado en la resolución aplicable.",
+      "expected_keywords": ["declaración", "anual", "renta"]
+    },
+    {
+      "id": "ev_07",
+      "topic": "primera_categoria",
+      "question": "¿Cómo se determina la renta neta imponible de primera categoría para personas naturales?",
+      "reference_answer": "La renta neta imponible de primera categoría se obtiene a partir de la renta neta de esa categoría, aplicando las deducciones y reglas del formulario y la cartilla de instrucciones.",
+      "expected_keywords": ["primera", "renta neta", "imponible"]
+    },
+    {
+      "id": "ev_08",
+      "topic": "evidencia_parcial",
+      "question": "Enumera textualmente todos los incisos del artículo 119 del Código Tributario sin omitir ninguno.",
+      "reference_answer": "Con los fragmentos disponibles no es posible reproducir íntegramente todos los incisos del artículo 119; la respuesta debe limitarse a lo que figure en el contexto o indicar que falta evidencia completa.",
+      "expected_keywords": ["evidencia", "contexto"]
+    },
+    {
+      "id": "ev_09",
+      "topic": "cuarta_categoria",
+      "question": "¿Qué diferencia básica hay entre renta de cuarta y quinta categoría?",
+      "reference_answer": "Cuarta categoría corresponde a trabajo independiente profesional u oficio; quinta categoría a trabajo en relación de dependencia bajo subordinación.",
+      "expected_keywords": ["cuarta", "quinta", "dependencia"]
+    },
+    {
+      "id": "ev_10",
+      "topic": "declaracion_anual",
+      "question": "¿Dónde puede una persona natural presentar su declaración de renta usando medios digitales SUNAT?",
+      "reference_answer": "Puede utilizar SUNAT Operaciones en línea, aplicaciones móviles autorizadas o canales virtuales indicados en las cartillas y resoluciones vigentes.",
+      "expected_keywords": ["declaración", "virtual", "SUNAT"]
+    }
+  ]
+}

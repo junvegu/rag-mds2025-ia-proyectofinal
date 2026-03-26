@@ -6,6 +6,7 @@ from .build_vector_index import BuildVectorIndexUseCase
 from .chunk_documents import ChunkDocumentsUseCase
 from .cite_answer import CitationGroundingResult, CiteAnswerUseCase
 from .embed_chunks import EmbedChunksUseCase, EmbeddedChunk
+from .evaluate_rag import EvaluateRagUseCase, PerQuestionEvalResult, RagEvaluationReport
 from .generate_answer import GenerateAnswerUseCase, build_sunat_rag_user_message
 from .load_documents import LoadDocumentsUseCase
 from .process_documents_use_case import ProcessDocumentsResult, ProcessDocumentsUseCase
@@ -22,6 +23,9 @@ __all__ = [
     "CiteAnswerUseCase",
     "EmbedChunksUseCase",
     "EmbeddedChunk",
+    "EvaluateRagUseCase",
+    "PerQuestionEvalResult",
+    "RagEvaluationReport",
     "GenerateAnswerUseCase",
     "build_sunat_rag_user_message",
     "LoadDocumentsUseCase",
