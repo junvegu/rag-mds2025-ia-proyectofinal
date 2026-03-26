@@ -33,6 +33,7 @@ from src.application.use_cases.build_bm25_index import BuildBm25IndexUseCase
 from src.application.use_cases.build_vector_index import BuildVectorIndexUseCase
 from src.application.use_cases.chunk_documents import ChunkDocumentsUseCase
 from src.application.use_cases.embed_chunks import EmbedChunksUseCase
+from src.application.use_cases.cite_answer import CiteAnswerUseCase
 from src.application.use_cases.generate_answer import GenerateAnswerUseCase
 from src.application.use_cases.load_documents import LoadDocumentsUseCase
 from src.application.use_cases.rerank_context import RerankContextUseCase
@@ -245,7 +246,10 @@ def main() -> int:
     rerank_uc = RerankContextUseCase(reranker=CrossEncoderReranker())
 
     logger.info("Cargando modelo de generación: %s", settings.generation_model_name)
-    gen_uc = GenerateAnswerUseCase(llm=QwenGenerator())
+    gen_uc = GenerateAnswerUseCase(
+        llm=QwenGenerator(),
+        citation_use_case=CiteAnswerUseCase(embedder),
+    )
 
     query_reports: list[dict[str, Any]] = []
 
@@ -299,6 +303,9 @@ def main() -> int:
                 "generation_seconds": generation_seconds,
                 "context_chunks": chunk_rows,
                 "answer_text": answer.text,
+                "grounding_score": answer.grounding_score,
+                "hallucination_flag": answer.hallucination_flag,
+                "sentence_citations": answer.metadata.get("sentence_citations", []),
                 "metadata_answer_keys": list(answer.metadata.keys()),
                 "quality_flags": flags,
             }

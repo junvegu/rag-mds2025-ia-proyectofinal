@@ -3,24 +3,24 @@ from typing import Any
 
 
 @dataclass(slots=True)
-class Citation:
-    """Grounding reference attached to an answer sentence."""
+class SentenceCitation:
+    """Evidencia asignada a una oración de la respuesta (post-generación)."""
 
+    sentence: str
     chunk_id: str
-    document_id: str
-    sentence_index: int | None = None
-    score: float | None = None
-    excerpt: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    source: str
+    page: int | None
+    similarity_score: float
 
 
 @dataclass(slots=True)
 class Answer:
-    """Answer model with sentence-level citations and quality metadata."""
+    """Respuesta con citas por oración, grounding agregado y metadatos de prompt."""
 
     question: str
     text: str
-    citations: list[Citation] = field(default_factory=list)
+    citations: list[SentenceCitation] = field(default_factory=list)
     grounding_score: float | None = None
+    hallucination_flag: bool = False
     hallucination_risk: float | None = None
     metadata: dict[str, Any] = field(default_factory=dict)

@@ -6,7 +6,8 @@ import logging
 from dataclasses import dataclass
 
 from src.application.ports.llm_port import LLMPort
-from src.domain.entities.answer import Answer
+from src.application.use_cases.cite_answer import CiteAnswerUseCase
+from src.domain.entities.answer import Answer, SentenceCitation
 from src.domain.entities.retrieval import RerankedChunkResult
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,7 @@ class GenerateAnswerUseCase:
     """Genera respuesta a partir de la pregunta y del top-k rerankeado."""
 
     llm: LLMPort
+    citation_use_case: CiteAnswerUseCase | None = None
 
     def execute(self, question: str, reranked_chunks: list[RerankedChunkResult]) -> Answer:
         stripped_q = question.strip()
@@ -95,20 +97,47 @@ class GenerateAnswerUseCase:
             for c in reranked_chunks
         ]
 
+        citations: list[SentenceCitation] = []
+        grounding_score: float | None = None
+        hallucination_flag = False
+        grounding_label: str | None = None
+
+        if self.citation_use_case is not None:
+            cite_result = self.citation_use_case.execute(answer_text, reranked_chunks)
+            citations = cite_result.citations
+            grounding_score = cite_result.grounding_score
+            hallucination_flag = cite_result.hallucination_flag
+            grounding_label = cite_result.grounding_label
+
         logger.info(
-            "Answer generated for question len=%s using %s chunks.",
+            "Answer generated for question len=%s using %s chunks (citations=%s grounding=%s).",
             len(stripped_q),
             len(reranked_chunks),
+            len(citations),
+            grounding_score,
         )
 
         return Answer(
             question=stripped_q,
             text=answer_text,
-            citations=[],
+            citations=citations,
+            grounding_score=grounding_score,
+            hallucination_flag=hallucination_flag,
             metadata={
                 "answer_text": answer_text,
                 "prompt_system": _SYSTEM_SUNAT_RAG,
                 "prompt_user": user_msg,
                 "context_chunks": context_meta,
+                "grounding_label": grounding_label,
+                "sentence_citations": [
+                    {
+                        "sentence": c.sentence,
+                        "chunk_id": c.chunk_id,
+                        "source": c.source,
+                        "page": c.page,
+                        "similarity_score": c.similarity_score,
+                    }
+                    for c in citations
+                ],
             },
         )

@@ -77,6 +77,9 @@ def test_generate_answer_preserves_context_chunks_in_metadata() -> None:
 
     assert ans.question == "Pregunta?"
     assert ans.text == "respuesta simulada"
+    assert ans.grounding_score is None
+    assert ans.hallucination_flag is False
+    assert ans.citations == []
     assert ans.metadata["answer_text"] == ans.text
     meta = ans.metadata["context_chunks"]
     assert len(meta) == 2

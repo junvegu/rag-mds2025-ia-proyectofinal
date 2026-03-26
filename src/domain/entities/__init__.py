@@ -1,6 +1,6 @@
 """Domain entities for the RAG system."""
 
-from .answer import Answer, Citation
+from .answer import Answer, SentenceCitation
 from .chunk import Chunk
 from .document import Document
 from .retrieval import HybridChunkResult, RerankedChunkResult, RetrievedChunk
@@ -8,7 +8,7 @@ from .retrieval import HybridChunkResult, RerankedChunkResult, RetrievedChunk
 __all__ = [
     "Document",
     "Chunk",
-    "Citation",
+    "SentenceCitation",
     "Answer",
     "RetrievedChunk",
     "HybridChunkResult",

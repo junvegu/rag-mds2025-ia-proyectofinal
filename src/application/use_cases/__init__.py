@@ -4,6 +4,7 @@ from .answer_question import AnswerQuestionUseCase
 from .build_bm25_index import BuildBm25IndexUseCase
 from .build_vector_index import BuildVectorIndexUseCase
 from .chunk_documents import ChunkDocumentsUseCase
+from .cite_answer import CitationGroundingResult, CiteAnswerUseCase
 from .embed_chunks import EmbedChunksUseCase, EmbeddedChunk
 from .generate_answer import GenerateAnswerUseCase, build_sunat_rag_user_message
 from .load_documents import LoadDocumentsUseCase
@@ -17,6 +18,8 @@ __all__ = [
     "BuildBm25IndexUseCase",
     "BuildVectorIndexUseCase",
     "ChunkDocumentsUseCase",
+    "CitationGroundingResult",
+    "CiteAnswerUseCase",
     "EmbedChunksUseCase",
     "EmbeddedChunk",
     "GenerateAnswerUseCase",
